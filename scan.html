@@ -5,21 +5,58 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Gala Check-In</title>
 <style>
-  body{font-family:system-ui;margin:24px}
-  .ok{font-size:28px}
-  .err{font-size:28px}
-  .hint{opacity:.7}
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: linear-gradient(135deg,#4b6cb7,#182848);
+    color: #fff;
+  }
+  .container {
+    text-align: center;
+    background: rgba(0,0,0,0.6);
+    padding: 40px 60px;
+    border-radius: 20px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  }
+  h1 {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    color: #ffd700;
+  }
+  .message {
+    margin-top: 20px;
+    font-size: 2rem;
+    padding: 20px;
+    border-radius: 15px;
+  }
+  .ok {
+    background-color: #28a745;
+    color: #fff;
+  }
+  .err {
+    background-color: #dc3545;
+    color: #fff;
+  }
+  .hint {
+    font-size: 1rem;
+    opacity: 0.7;
+  }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<h1>Gala · Check-In</h1>
-<div id="out">Procesando…</div>
+<div class="container">
+  <h1>Gala · Check-In</h1>
+  <div id="out" class="message">Procesando…</div>
+</div>
 <script>
 const SUPABASE_URL = "https://apfnkbksdtfmwwfvdson.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwZm5rYmtzZHRmbXd3ZnZkc29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1Mjc1NTQsImV4cCI6MjA3MjEwMzU1NH0.vjHjuL0hOT5-g8duCrKNbOBjs0q75XsqvboRd0vG8k4";
-
-// opcional ESP32
 const esp32URL = "http://esp32.local/notify";
 
 const { createClient } = window.supabase;
@@ -29,28 +66,27 @@ const qs = new URLSearchParams(location.search);
 const code = qs.get("code");
 
 (async ()=>{
+  const out = document.getElementById('out');
   if(!code){
-    document.getElementById('out').innerHTML="<p class=err>QR inválido</p>";
+    out.className = 'message err';
+    out.innerHTML = "QR inválido";
     return;
   }
   const { data, error } = await sb.rpc('check_in', { p_code: code });
   if(error){
-    document.getElementById('out').innerHTML="<p class=err>ERROR</p><p class=hint>"+error.message+"</p>";
+    out.className = 'message err';
+    out.innerHTML = "ERROR<br><span class='hint'>"+error.message+"</span>";
     return;
   }
   const row = data?.[0];
   if(row?.granted){
-    document.getElementById('out').innerHTML = `
-      <p class=ok>✅ ACCESO CONCEDIDO</p>
-      <p>Mesa <b>${code}</b> · Escaneos: ${row.scans} · Restantes: ${row.remaining}</p>`;
-    fetch(`${esp32URL}?code=${code}&status=ok&scans=${row.scans}&rem=${row.remaining}`)
-      .catch(()=>{});
-  }else{
-    document.getElementById('out').innerHTML = `
-      <p class=err>⛔ ACCESO DENEGADO</p>
-      <p>Mesa <b>${code}</b> agotó sus ${row?.scans ?? 10} accesos.</p>`;
-    fetch(`${esp32URL}?code=${code}&status=deny&scans=${row?.scans ?? 10}&rem=0`)
-      .catch(()=>{});
+    out.className = 'message ok';
+    out.innerHTML = `✅ ACCESO CONCEDIDO<br>Mesa <b>${code}</b><br>Escaneos: ${row.scans}<br>Restantes: ${row.remaining}`;
+    fetch(`${esp32URL}?code=${code}&status=ok&scans=${row.scans}&rem=${row.remaining}`).catch(()=>{});
+  } else {
+    out.className = 'message err';
+    out.innerHTML = `⛔ ACCESO DENEGADO<br>Mesa <b>${code}</b> agotó sus ${row?.scans ?? 10} accesos.`;
+    fetch(`${esp32URL}?code=${code}&status=deny&scans=${row?.scans ?? 10}&rem=0`).catch(()=>{});
   }
 })();
 </script>
