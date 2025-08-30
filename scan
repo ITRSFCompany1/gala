@@ -1,0 +1,42 @@
+<!doctype html><html><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Gala Check-In</title>
+<style>body{font-family:system-ui;margin:24px} .ok{font-size:28px}
+.err{font-size:28px} .hint{opacity:.7}</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head><body>
+<h1>Gala · Check-In</h1>
+<div id="out">Procesando…</div>
+<script>
+const SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
+const SUPABASE_ANON = "TU_ANON_KEY"; // seguro porque solo ejecuta la función
+const esp32URL = "http://esp32.local/notify"; // opcional para LEDs/LCD
+
+const { createClient } = window.supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const qs = new URLSearchParams(location.search);
+const code = qs.get("code");
+
+(async ()=>{
+  if(!code){ document.getElementById('out').innerHTML="<p class=err>QR inválido</p>"; return; }
+  const { data, error } = await sb.rpc('check_in', { p_code: code });
+  if(error){ document.getElementById('out').innerHTML="<p class=err>ERROR</p><p class=hint>"+error.message+"</p>"; return; }
+  const row = data?.[0];
+  if(row?.granted){
+    document.getElementById('out').innerHTML = `
+      <p class=ok>✅ ACCESO CONCEDIDO</p>
+      <p>Mesa <b>${code}</b> · Escaneos: ${row.scans} · Restantes: ${row.remaining}</p>`;
+    // Notificar ESP32 (opcional)
+    fetch(`${esp32URL}?code=${code}&status=ok&scans=${row.scans}&rem=${row.remaining}`)
+      .catch(()=>{});
+  }else{
+    document.getElementById('out').innerHTML = `
+      <p class=err>⛔ ACCESO DENEGADO</p>
+      <p>Mesa <b>${code}</b> agotó sus ${row?.scans ?? 10} accesos.</p>`;
+    fetch(`${esp32URL}?code=${code}&status=deny&scans=${row?.scans ?? 10}&rem=0`)
+      .catch(()=>{});
+  }
+})();
+</script>
+</body></html>
